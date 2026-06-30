@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Search · Case Analysis by Workstream</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', -apple-system, sans-serif; background: #f5f6f4; color: #0d2e2e; padding-bottom: 60px; }
+
+    header {
+      background: #0d3d42;
+      color: white; padding: 26px 40px;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+    }
+    header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+    header p  { font-size: 0.82rem; opacity: 0.5; margin-top: 5px; }
+    .header-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; padding: 6px 14px; font-size: 0.78rem; color: rgba(255,255,255,0.8); text-decoration: none; white-space: nowrap; font-family: inherit; transition: background .15s; }
+    .header-btn:hover { background: rgba(255,255,255,0.14); color: white; }
+    #generatedBadge { font-size: 0.75rem; color: rgba(255,255,255,0.4); }
+
+    .kpi-section { padding: 28px 40px 0; }
+    .kpi-row { display: flex; gap: 14px; flex-wrap: wrap; }
+    .kpi-row + .kpi-row { margin-top: 14px; padding-left: 20px; border-left: 3px solid #A1CCA6; }
+    .kpi-sublabel { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: #097C87; margin-bottom: 8px; margin-top: 18px; }
+    .kpi { background: white; border-radius: 14px; padding: 18px 22px; flex: 1; min-width: 140px;
+      box-shadow: 0 1px 3px rgba(9,124,135,0.08), 0 1px 8px rgba(9,124,135,0.04);
+      border-left: 4px solid #23CED9; cursor: pointer; transition: box-shadow .15s, transform .1s; }
+    .kpi:hover { box-shadow: 0 4px 16px rgba(9,124,135,0.15); transform: translateY(-1px); }
+    .kpi .val { font-size: 2rem; font-weight: 700; color: #097C87; letter-spacing: -0.03em; }
+    .kpi .lbl { font-size: 0.7rem; color: #5a8a8a; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
+    .kpi.green  { border-color: #A1CCA6; } .kpi.green .val  { color: #2e7d4f; }
+    .kpi.amber  { border-color: #c9a84c; } .kpi.amber .val  { color: #8a6d00; }
+    .kpi.red    { border-color: #8fbcbf; } .kpi.red .val    { color: #097C87; }
+    .kpi.orange { border-color: #8fbcbf; } .kpi.orange .val { color: #097C87; }
+    .kpi.plain  { border-color: #23CED9; } .kpi.plain .val  { color: #097C87; }
+
+    .section-label { padding: 32px 40px 0; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: #097C87; }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 14px 40px 0; }
+    .card { background: white; border-radius: 16px; padding: 26px; box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 8px rgba(0,0,0,0.04); }
+    .card.full { grid-column: 1 / -1; }
+    .card h2 { font-size: 0.88rem; font-weight: 600; margin-bottom: 18px; color: #0d2e2e; display: flex; align-items: center; gap: 8px; letter-spacing: -0.01em; }
+    .card h2 .hint { font-weight: 400; font-size: 0.75rem; color: #7ab8bc; }
+    canvas { max-height: 300px; cursor: pointer; }
+
+    /* Drill-down modal */
+    #modal { display: none; position: fixed; inset: 0; background: rgba(28,25,23,0.5); z-index: 100; align-items: flex-start; justify-content: center; padding: 40px 20px; overflow-y: auto; backdrop-filter: blur(2px); }
+    #modal.open { display: flex; }
+    #modalBox { background: white; border-radius: 18px; width: 100%; max-width: 1150px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,0.2); }
+    #modalHeader { padding: 22px 28px; border-bottom: 1px solid #e8f5f6; display: flex; align-items: center; justify-content: space-between; }
+    #modalTitle { font-size: 0.95rem; font-weight: 700; color: #097C87; }
+    #modalClose { background: #e8f5f6; border: none; border-radius: 8px; padding: 6px 14px; cursor: pointer; font-size: 0.82rem; color: #097C87; font-family: inherit; }
+    #modalClose:hover { background: #d0ecee; }
+    #modalBody { overflow-y: auto; padding: 16px 28px 28px; }
+    #modalCount { font-size: 0.78rem; color: #5a9a9e; margin-bottom: 14px; font-weight: 500; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    thead th { background: #f0fafa; text-align: left; padding: 10px 12px; font-weight: 600; color: #097C87; border-bottom: 1px solid #c8e8ea; white-space: nowrap; position: sticky; top: 0; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    tbody tr { border-bottom: 1px solid #eef7f8; }
+    tbody tr:hover { background: #f4fafb; }
+    tbody td { padding: 9px 12px; vertical-align: top; color: #0d2e2e; }
+    .pill { display: inline-block; border-radius: 20px; padding: 2px 10px; font-size: 0.7rem; font-weight: 600; }
+    .pill.P1 { background:#fde8d8; color:#8a3a10; }
+    .pill.P2 { background:#fef3c7; color:#7a5a00; }
+    .pill.P3 { background:#d4f0ee; color:#097C87; }
+    .pill.P4 { background:#d8f0d8; color:#2d6a2d; }
+    .pill.Closed { background:#c8ecc8; color:#1a5a1a; }
+    .pill.open   { background:#fde8d8; color:#8a4a10; }
+
+    @media (max-width: 768px) {
+      .grid { grid-template-columns: 1fr; }
+      .card.full { grid-column: 1; }
+      .kpi-section, .section-label, .grid { padding-left: 16px; padding-right: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>AI Search &mdash; Case Analysis by Workstream</h1>
+    <p style="margin-top:5px;margin-bottom:7px;font-size:0.82rem;opacity:0.5" id="generatedBadge">Data: Mar &ndash; May 2026</p>
+    <p>Click any chart or KPI card to drill down into individual cases</p>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <a href="https://support.servicenow.com/sys_report_template.do?jvar_report_id=b3dcb41c47950f10ac90112a636d43cb#" target="_blank" class="header-btn">&#8599; Data Source</a>
+    <a href="https://tasportal.corp.service-now.com/aiproducts-analysis/" target="_blank" class="header-btn">&#8599; Source Dashboard</a>
+  </div>
+</header>
+
+<div class="kpi-section">
+  <!-- Row 1: top-level totals -->
+  <div class="kpi-row" id="kpiRowTop"></div>
+  <!-- Row 2: breakdown under excl-PRB -->
+  <div class="kpi-sublabel" style="margin-top:16px">Breakdown — Excluding PRB-linked Cases</div>
+  <div class="kpi-row" id="kpiRowSub"></div>
+</div>
+
+<!-- Main Charts -->
+<div class="section-label">Analysis — Excluding PRB-linked Cases</div>
+<div class="grid">
+  <div class="card full">
+    <h2>Cases Created vs Closed Per Month <span class="hint">(click a bar to see cases)</span></h2>
+    <canvas id="monthlyChart"></canvas>
+  </div>
+</div>
+
+<div class="section-label">Workstream Analysis</div>
+<div style="margin: 12px 40px 0; background: white; border-radius: 14px; padding: 18px 24px; box-shadow: 0 1px 3px rgba(9,124,135,0.08); border-left: 4px solid #23CED9;">
+  <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#097C87;margin-bottom:8px">Classification Methodology</div>
+  <div style="font-size:0.82rem;color:#2a6a70;line-height:1.7">
+    <p style="margin-bottom:10px">All <strong>557 non-PRB cases</strong> were classified into workstreams using a structured two-pass approach:</p>
+
+    <p style="font-weight:600;color:#097C87;margin-bottom:6px">① Pass 1 — Keyword Matching</p>
+    <p style="margin-bottom:8px">Each case subject and full description was scanned against curated keyword lists. Workstreams were applied in priority order — more specific workstreams take precedence over the broad Setup bucket. Keywords matched per workstream:</p>
+    <ul style="list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;margin-bottom:14px">
+      <li style="background:#f0fafa;border-radius:8px;padding:8px 12px">
+        <span style="font-weight:600;color:#097C87">Zing Search</span><br>
+        <span style="color:#5a8a8a;font-size:0.78rem"><em>zing</em> in subject line; <em>zing search</em> anywhere in text</span>
+      </li>
+      <li style="background:#f0fafa;border-radius:8px;padding:8px 12px">
+        <span style="font-weight:600;color:#097C87">Migration &amp; Upgrades</span><br>
+        <span style="color:#5a8a8a;font-size:0.78rem"><em>migrate, migration, upgrade, patch</em></span>
+      </li>
+      <li style="background:#f0fafa;border-radius:8px;padding:8px 12px">
+        <span style="font-weight:600;color:#097C87">External Content Connectors</span><br>
+        <span style="color:#5a8a8a;font-size:0.78rem"><em>connector, external source, external content, SharePoint connector, crawl, external knowledge</em></span>
+      </li>
+      <li style="background:#f0fafa;border-radius:8px;padding:8px 12px">
+        <span style="font-weight:600;color:#097C87">Search &amp; Virtual Agent</span><br>
+        <span style="color:#5a8a8a;font-size:0.78rem"><em>virtual agent, genius results, RAG retriever</em>; or <em>Now Assist</em> paired with <em>virtual agent / genius / VA search</em></span>
+      </li>
+      <li style="background:#f0fafa;border-radius:8px;padding:8px 12px">
+        <span style="font-weight:600;color:#097C87">Search Analytics</span><br>
+        <span style="color:#5a8a8a;font-size:0.78rem"><em>search analytics, search signal, sys_search_event, search tracking, search term, sustained reduction</em></span>
+      </li>
+      <li style="background:#f0fafa;border-radius:8px;padding:8px 12px">
+        <span style="font-weight:600;color:#097C87">Security &amp; Access</span><br>
+        <span style="color:#5a8a8a;font-size:0.78rem"><em>permission, access control, user criteria, visibility, ACL, guest account, restricted knowledge, unauthorized</em></span>
+      </li>
+      <li style="background:#f0fafa;border-radius:8px;padding:8px 12px">
+        <span style="font-weight:600;color:#097C87">Search Relevancy</span><br>
+        <span style="color:#5a8a8a;font-size:0.78rem"><em>relevancy, ranking, inconsistent results, no results, RAG retrieval, hybrid search, multilingual, boosting, boost action, result improvement rules, semantic, machine learning, recommended action</em></span>
+      </li>
+      <li style="background:#f0fafa;border-radius:8px;padding:8px 12px">
+        <span style="font-weight:600;color:#097C87">AI Search Setup &amp; Misc</span><br>
+        <span style="color:#5a8a8a;font-size:0.78rem"><em>provision, activate, index event, index queue, search profile, plugin, publish, datasource, AIS status, not enabled, catalog item, dictionary, spell check, self-hosted</em> + broad setup terms</span>
+      </li>
+    </ul>
+
+    <p style="font-weight:600;color:#097C87;margin-bottom:6px">② Pass 2 — SME Validation</p>
+    <p>Cases not matched in Pass 1 were escalated for subject matter expert review. Each case's full description and resolution notes were evaluated against workstream definitions to ensure accurate placement. Cases outside the AI Search scope (e.g. platform performance, ATF testing, routing requests) were consolidated under <strong>Others</strong>. After both passes, <strong>0 cases remained unclassified</strong>.</p>
+  </div>
+</div>
+<div class="grid">
+  <div class="card full">
+    <h2>Cases by Workstream <span class="hint">(click to drill down)</span></h2>
+    <canvas id="bucketChart"></canvas>
+  </div>
+  <div class="card full">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <h2 style="margin-bottom:0">Month-on-Month Trend by Workstream <span class="hint">(click a point to see cases)</span></h2>
+      <div style="display:flex;gap:8px">
+        <button id="btnSelectAll" onclick="toggleAllLines(true)" style="background:#097C87;color:white;border:none;border-radius:20px;padding:5px 14px;font-size:0.75rem;font-weight:600;cursor:pointer;font-family:inherit">Select All</button>
+        <button id="btnDeselectAll" onclick="toggleAllLines(false)" style="background:#f0fafa;color:#097C87;border:1px solid #23CED9;border-radius:20px;padding:5px 14px;font-size:0.75rem;font-weight:600;cursor:pointer;font-family:inherit">Deselect All</button>
+      </div>
+    </div>
+    <canvas id="bucketTrendChart" style="max-height:360px"></canvas>
+  </div>
+</div>
+
+
+<!-- Drill-down Modal -->
+<div id="modal">
+  <div id="modalBox">
+    <div id="modalHeader">
+      <span id="modalTitle"></span>
+      <button id="modalClose">✕ Close</button>
+    </div>
+    <div id="modalBody">
+      <div id="modalCount"></div>
+      <table>
+        <thead>
+          <tr>
+            <th>Case</th><th>Subject</th><th>Priority</th><th>State</th>
+            <th>Workstream</th><th>Product</th><th>Root Cause</th><th>Defect</th><th>PRB</th>
+            <th>Opened</th><th>Resolved</th><th>Days</th>
+          </tr>
+        </thead>
+        <tbody id="modalTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+fetch('data.json').then(r => r.json()).then(data => {
+  const main = data.main;
+  const prb  = data.prb;
+
+  // ── helpers ──────────────────────────────────────────────
+  function count(arr, key) {
+    const m = {};
+    arr.forEach(r => { const v = r[key] || '—'; m[v] = (m[v] || 0) + 1; });
+    return Object.entries(m).sort((a,b) => b[1]-a[1]);
+  }
+
+  function countMonth(arr, key) {
+    const m = {};
+    arr.forEach(r => {
+      const v = r[key];
+      if (v && v !== '—' && v !== 'NaT') m[v] = (m[v] || 0) + 1;
+    });
+    return m;
+  }
+
+  function openModal(title, rows) {
+    document.getElementById('modalTitle').textContent = title;
+    document.getElementById('modalCount').textContent = rows.length + ' cases';
+    const tbody = document.getElementById('modalTableBody');
+    tbody.innerHTML = rows.map(r => {
+      const priClass = r['Pri'] || '';
+      const stateClass = r['State'] === 'Closed' ? 'Closed' : 'open';
+      return `<tr>
+        <td><b>${r['Cases']}</b></td>
+        <td style="max-width:260px">${r['Subject']}</td>
+        <td><span class="pill ${priClass}">${r['Pri']}</span></td>
+        <td><span class="pill ${stateClass}">${r['State']}</span></td>
+        <td style="white-space:nowrap">${r['Bucket']||'—'}</td>
+        <td>${r['Product']}</td>
+        <td>${r['Root Cause']}</td>
+        <td>${r['Defect']}</td>
+        <td>${r['PRB']}</td>
+        <td style="white-space:nowrap">${(r['Date Opened']||'').slice(0,10)}</td>
+        <td style="white-space:nowrap">${(r['Date Resolved']||'').slice(0,10)}</td>
+        <td>${r['Days to Resolve']}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('modal').classList.add('open');
+  }
+
+  document.getElementById('modalClose').onclick = () => document.getElementById('modal').classList.remove('open');
+  document.getElementById('modal').onclick = e => { if (e.target === document.getElementById('modal')) document.getElementById('modal').classList.remove('open'); };
+
+  function drillChart(chart, evt, filterFn) {
+    const pts = chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, false);
+    if (!pts.length) return;
+    const label = chart.data.labels[pts[0].index];
+    const dsLabel = chart.data.datasets[pts[0].datasetIndex].label || '';
+    const rows = main.filter(r => filterFn(r, label, dsLabel));
+    if (rows.length) openModal(dsLabel ? `${dsLabel}: ${label}` : label, rows);
+  }
+
+  // ── KPI Cards ────────────────────────────────────────────
+  const allCases  = [...main, ...prb];
+  const closed    = main.filter(r => r['State'] === 'Closed').length;
+  const openCases = main.filter(r => r['State'] !== 'Closed').length;
+  const p1        = main.filter(r => r['Pri'] === 'P1').length;
+  const ttrs      = main.map(r => parseFloat(r['Days to Resolve'])).filter(v => !isNaN(v));
+  const avgTTR    = ttrs.length ? (ttrs.reduce((a,b)=>a+b,0)/ttrs.length).toFixed(1) : '—';
+
+  function makeKPI(container, val, lbl, cls, onClickFn) {
+    const d = document.createElement('div');
+    d.className = 'kpi ' + (cls || 'plain');
+    d.innerHTML = `<div class="val">${val}</div><div class="lbl">${lbl}</div>`;
+    if (onClickFn) d.onclick = onClickFn;
+    container.appendChild(d);
+  }
+
+  const topRow = document.getElementById('kpiRowTop');
+  makeKPI(topRow, allCases.length, 'Total Cases',              'plain',  () => openModal('All Cases', allCases));
+  makeKPI(topRow, main.length,     'Total Cases (Excl. PRBs)', 'plain',  () => openModal('All Cases (Excl. PRBs)', main));
+  makeKPI(topRow, prb.length,      'PRB-Linked Cases',         'orange', () => openModal('PRB-Linked Cases', prb));
+
+  const subRow = document.getElementById('kpiRowSub');
+  makeKPI(subRow, closed,     'Closed',               'green', () => openModal('Closed Cases', main.filter(r => r['State']==='Closed')));
+  makeKPI(subRow, openCases,  'Open / In Progress',   'amber', () => openModal('Open / In Progress', main.filter(r => r['State']!=='Closed')));
+  makeKPI(subRow, p1,         'P1 Cases',             'red',   () => openModal('P1 Cases', main.filter(r => r['Pri']==='P1')));
+  makeKPI(subRow, avgTTR,     'Avg Days to Resolve',  'plain', null);
+
+  // ── Monthly Chart ─────────────────────────────────────────
+  const allMonths = [...new Set([
+    ...Object.keys(countMonth(main,'Month Opened')),
+    ...Object.keys(countMonth(main,'Month Closed'))
+  ])].filter(m => m && m!=='NaT').sort();
+
+  const createdByMonth = countMonth(main, 'Month Opened');
+  const closedByMonth  = countMonth(main, 'Month Closed');
+
+  const monthlyChart = new Chart(document.getElementById('monthlyChart'), {
+    type: 'bar',
+    data: {
+      labels: allMonths.map(m => { const [y,mo]=m.split('-'); return new Date(y,mo-1).toLocaleString('default',{month:'short',year:'numeric'}); }),
+      datasets: [
+        { label: 'Created', data: allMonths.map(m => createdByMonth[m]||0), backgroundColor: '#FCA47C', borderRadius: 6 },
+        { label: 'Closed',  data: allMonths.map(m => closedByMonth[m]||0),  backgroundColor: '#097C87', borderRadius: 6 }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'top' } },
+      scales: { y: { beginAtZero: true } },
+      onClick: (evt, _, chart) => {
+        const pts = chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, false);
+        if (!pts.length) return;
+        const monthStr = allMonths[pts[0].index];
+        const dsLabel  = chart.data.datasets[pts[0].datasetIndex].label;
+        const key      = dsLabel === 'Created' ? 'Month Opened' : 'Month Closed';
+        const rows     = main.filter(r => r[key] === monthStr);
+        openModal(`${dsLabel} in ${chart.data.labels[pts[0].index]}`, rows);
+      }
+    }
+  });
+
+  // ── Workstream Bar ─────────────────────────────────────
+  const BUCKET_COLORS = {
+    'AI Search Setup & Misc':       '#097C87',
+    'Search Relevancy':             '#FCA47C',
+    'Search & Virtual Agent':       '#23CED9',
+    'Security & Access':            '#A1CCA6',
+    'Migration & Upgrades':         '#F9D779',
+    'Search Analytics':             '#0a9aa6',
+    'Zing Search':                  '#f07a4a',
+    'External Content Connectors':  '#6ab89a',
+    'Others':                       '#b8d4d6',
+    'Needs Review':                 '#d4e8ea',
+  };
+  // Sort: Others always last
+  const bucketData = count(main, 'Bucket').sort((a,b) => {
+    if (a[0]==='Others') return 1;
+    if (b[0]==='Others') return -1;
+    return b[1]-a[1];
+  });
+  new Chart(document.getElementById('bucketChart'), {
+    type: 'bar',
+    data: {
+      labels: bucketData.map(d=>d[0]),
+      datasets: [{ label: 'Cases', data: bucketData.map(d=>d[1]),
+        backgroundColor: bucketData.map(d => BUCKET_COLORS[d[0]] || '#94a3b8'), borderRadius: 6 }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true } },
+      onClick: (evt, _, chart) => {
+        const pts = chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, false);
+        if (!pts.length) return;
+        const bucket = bucketData[pts[0].index][0];
+        openModal('Workstream: ' + bucket, main.filter(r => r['Bucket'] === bucket));
+      }
+    }
+  });
+
+  // ── Workstream Trend (line chart, one line per workstream) ─
+  const workstreams = bucketData.map(d => d[0]);
+  const monthLabels = allMonths.map(m => { const [y,mo]=m.split('-'); return new Date(y,mo-1).toLocaleString('default',{month:'short',year:'numeric'}); });
+  const trendChart = new Chart(document.getElementById('bucketTrendChart'), {
+    type: 'line',
+    data: {
+      labels: monthLabels,
+      datasets: workstreams.map(ws => ({
+        label: ws,
+        data: allMonths.map(m => main.filter(r => r['Bucket']===ws && r['Month Opened']===m).length),
+        borderColor: BUCKET_COLORS[ws] || '#94a3b8',
+        backgroundColor: 'transparent',
+        pointBackgroundColor: BUCKET_COLORS[ws] || '#94a3b8',
+        tension: 0.3,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        borderWidth: 2,
+      }))
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } } },
+      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+      onClick: (evt, _, chart) => {
+        const pts = chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, false);
+        if (!pts.length) return;
+        const monthStr = allMonths[pts[0].index];
+        const ws = chart.data.datasets[pts[0].datasetIndex].label;
+        const rows = main.filter(r => r['Bucket']===ws && r['Month Opened']===monthStr);
+        if (rows.length) openModal(`${ws} — ${monthLabels[pts[0].index]}`, rows);
+      }
+    }
+  });
+
+});
+
+function toggleAllLines(show) {
+  const chart = Chart.getChart('bucketTrendChart');
+  if (!chart) return;
+  chart.data.datasets.forEach((ds, i) => {
+    chart.setDatasetVisibility(i, show);
+  });
+  chart.update();
+}
+</script>
+</body>
+</html>
