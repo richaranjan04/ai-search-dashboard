@@ -93,7 +93,7 @@
 
 <div style="margin: 18px 40px 0; background: #f0fafa; border-left: 4px solid #23CED9; border-radius: 12px; padding: 14px 20px;">
   <p style="font-size: 0.82rem; color: #2a6a70; line-height: 1.6;">
-    <strong>Note on PRB-linked cases:</strong> This dashboard does not currently split out PRB-linked cases because the source data export does not include a reliable case-to-PRB mapping. The analysis reflects all cases tagged as AI Search, with or without associated PRBs.
+    This dashboard does not currently split out PRB-linked cases because the source data export does not include a reliable case-to-PRB mapping. The analysis reflects all cases tagged as AI Search, with or without PRBs.
   </p>
 </div>
 
@@ -114,7 +114,7 @@
 <div style="margin: 12px 40px 0; background: white; border-radius: 14px; padding: 18px 24px; box-shadow: 0 1px 3px rgba(9,124,135,0.08); border-left: 4px solid #23CED9;">
   <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#097C87;margin-bottom:8px">Classification Methodology</div>
   <div style="font-size:0.82rem;color:#2a6a70;line-height:1.7">
-    <p style="margin-bottom:10px">All cases tagged as <strong>AI Search</strong> in the source data were classified into workstreams using a structured two-pass approach:</p>
+    <p style="margin-bottom:10px">All cases tagged as <strong>AI Search</strong> in the source data were classified into <strong>9 workstreams</strong> using a structured two-pass approach:</p>
 
     <p style="font-weight:600;color:#097C87;margin-bottom:6px">① Pass 1 — Keyword Matching</p>
     <p style="margin-bottom:8px">Each case subject and full description was scanned against curated keyword lists. Workstreams were applied in priority order — more specific workstreams take precedence over the broad Setup bucket. Keywords matched per workstream:</p>
@@ -132,8 +132,12 @@
         <span style="color:#5a8a8a;font-size:0.78rem"><em>connector, external source, external content, SharePoint connector, crawl, external knowledge</em></span>
       </li>
       <li style="background:#f0fafa;border-radius:8px;padding:8px 12px">
-        <span style="font-weight:600;color:#097C87">Search &amp; Virtual Agent</span><br>
-        <span style="color:#5a8a8a;font-size:0.78rem"><em>virtual agent, genius results, RAG retriever</em>; or <em>Now Assist</em> paired with <em>virtual agent / genius / VA search</em></span>
+        <span style="font-weight:600;color:#097C87">Virtual Agent</span><br>
+        <span style="color:#5a8a8a;font-size:0.78rem"><em>virtual agent, Now Assist, NAVA, VA search, VA profile, Now Assist Chatbot, suggested steps generation, agentic workflow</em></span>
+      </li>
+      <li style="background:#f0fafa;border-radius:8px;padding:8px 12px">
+        <span style="font-weight:600;color:#097C87">Genius Results</span><br>
+        <span style="color:#5a8a8a;font-size:0.78rem"><em>genius result, genius results, Now Assist paired with genius</em></span>
       </li>
       <li style="background:#f0fafa;border-radius:8px;padding:8px 12px">
         <span style="font-weight:600;color:#097C87">Search Analytics</span><br>
@@ -326,12 +330,13 @@ fetch('data.json').then(r => r.json()).then(data => {
   const BUCKET_COLORS = {
     'AI Search Setup & Misc':       '#097C87',
     'Search Relevancy':             '#FCA47C',
-    'Search & Virtual Agent':       '#23CED9',
+    'Virtual Agent':                '#23CED9',
+    'Genius Results':               '#6ab89a',
     'Security & Access':            '#A1CCA6',
     'Migration & Upgrades':         '#F9D779',
     'Search Analytics':             '#0a9aa6',
     'Zing Search':                  '#f07a4a',
-    'External Content Connectors':  '#6ab89a',
+    'External Content Connectors':  '#5a9a8a',
     'Others':                       '#b8d4d6',
     'Needs Review':                 '#d4e8ea',
   };
