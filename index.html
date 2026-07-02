@@ -92,15 +92,11 @@
 </header>
 
 <div class="kpi-section">
-  <!-- Row 1: top-level totals -->
   <div class="kpi-row" id="kpiRowTop"></div>
-  <!-- Row 2: breakdown under excl-PRB -->
-  <div class="kpi-sublabel" style="margin-top:16px">Breakdown — Excluding PRB-linked Cases</div>
-  <div class="kpi-row" id="kpiRowSub"></div>
 </div>
 
 <!-- Main Charts -->
-<div class="section-label">Analysis — Excluding PRB-linked Cases</div>
+<div class="section-label">Analysis</div>
 <div class="grid">
   <div class="card full">
     <h2>Cases Created vs Closed Per Month <span class="hint">(click a bar to see cases)</span></h2>
@@ -112,7 +108,7 @@
 <div style="margin: 12px 40px 0; background: white; border-radius: 14px; padding: 18px 24px; box-shadow: 0 1px 3px rgba(9,124,135,0.08); border-left: 4px solid #23CED9;">
   <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#097C87;margin-bottom:8px">Classification Methodology</div>
   <div style="font-size:0.82rem;color:#2a6a70;line-height:1.7">
-    <p style="margin-bottom:10px">All <strong>557 non-PRB cases</strong> were classified into workstreams using a structured two-pass approach:</p>
+    <p style="margin-bottom:10px">All cases tagged as <strong>AI Search</strong> in the source data were classified into workstreams using a structured two-pass approach:</p>
 
     <p style="font-weight:600;color:#097C87;margin-bottom:6px">① Pass 1 — Keyword Matching</p>
     <p style="margin-bottom:8px">Each case subject and full description was scanned against curated keyword lists. Workstreams were applied in priority order — more specific workstreams take precedence over the broad Setup bucket. Keywords matched per workstream:</p>
@@ -153,6 +149,10 @@
 
     <p style="font-weight:600;color:#097C87;margin-bottom:6px">② Pass 2 — SME Validation</p>
     <p>Cases not matched in Pass 1 were escalated for subject matter expert review. Each case's full description and resolution notes were evaluated against workstream definitions to ensure accurate placement. Cases outside the AI Search scope (e.g. platform performance, ATF testing, routing requests) were consolidated under <strong>Others</strong>. After both passes, <strong>0 cases remained unclassified</strong>.</p>
+
+    <p style="margin-top:14px;font-size:0.78rem;color:#5a8a8a;background:#f0fafa;border-radius:8px;padding:10px 14px">
+      <strong>Note on PRB-linked cases:</strong> This dashboard does not currently split out PRB-linked cases because the source data export does not include a reliable case-to-PRB mapping. The analysis reflects all cases tagged as AI Search, with or without associated PRBs.
+    </p>
   </div>
 </div>
 <div class="grid">
@@ -186,7 +186,7 @@
         <thead>
           <tr>
             <th>Case</th><th>Subject</th><th>Priority</th><th>State</th>
-            <th>Workstream</th><th>Product</th><th>Root Cause</th><th>Defect</th><th>PRB</th>
+            <th>Workstream</th><th>Product</th>
             <th>Opened</th><th>Resolved</th><th>Days</th>
           </tr>
         </thead>
@@ -199,7 +199,6 @@
 <script>
 fetch('data.json').then(r => r.json()).then(data => {
   const main = data.main;
-  const prb  = data.prb;
 
   // ── helpers ──────────────────────────────────────────────
   function count(arr, key) {
@@ -231,9 +230,6 @@ fetch('data.json').then(r => r.json()).then(data => {
         <td><span class="pill ${stateClass}">${r['State']}</span></td>
         <td style="white-space:nowrap">${r['Bucket']||'—'}</td>
         <td>${r['Product']}</td>
-        <td>${r['Root Cause']}</td>
-        <td>${r['Defect']}</td>
-        <td>${r['PRB']}</td>
         <td style="white-space:nowrap">${(r['Date Opened']||'').slice(0,10)}</td>
         <td style="white-space:nowrap">${(r['Date Resolved']||'').slice(0,10)}</td>
         <td>${r['Days to Resolve']}</td>
@@ -255,7 +251,7 @@ fetch('data.json').then(r => r.json()).then(data => {
   }
 
   // ── KPI Cards ────────────────────────────────────────────
-  const allCases  = [...main, ...prb];
+  const total     = main.length;
   const closed    = main.filter(r => r['State'] === 'Closed').length;
   const openCases = main.filter(r => r['State'] !== 'Closed').length;
   const p1        = main.filter(r => r['Pri'] === 'P1').length;
@@ -271,15 +267,19 @@ fetch('data.json').then(r => r.json()).then(data => {
   }
 
   const topRow = document.getElementById('kpiRowTop');
-  makeKPI(topRow, allCases.length, 'Total Cases',              'plain',  () => openModal('All Cases', allCases));
-  makeKPI(topRow, main.length,     'Total Cases (Excl. PRBs)', 'plain',  () => openModal('All Cases (Excl. PRBs)', main));
-  makeKPI(topRow, prb.length,      'PRB-Linked Cases',         'orange', () => openModal('PRB-Linked Cases', prb));
+  makeKPI(topRow, total,     'Total Cases',         'plain', () => openModal('All Cases', main));
+  makeKPI(topRow, closed,     'Closed',              'green', () => openModal('Closed Cases', main.filter(r => r['State']==='Closed')));
+  makeKPI(topRow, openCases,  'Open / In Progress',  'amber', () => openModal('Open / In Progress', main.filter(r => r['State']!=='Closed')));
+  makeKPI(topRow, p1,         'P1 Cases',            'red',   () => openModal('P1 Cases', main.filter(r => r['Pri']==='P1')));
+  makeKPI(topRow, avgTTR,     'Avg Days to Resolve', 'plain', null);
 
-  const subRow = document.getElementById('kpiRowSub');
-  makeKPI(subRow, closed,     'Closed',               'green', () => openModal('Closed Cases', main.filter(r => r['State']==='Closed')));
-  makeKPI(subRow, openCases,  'Open / In Progress',   'amber', () => openModal('Open / In Progress', main.filter(r => r['State']!=='Closed')));
-  makeKPI(subRow, p1,         'P1 Cases',             'red',   () => openModal('P1 Cases', main.filter(r => r['Pri']==='P1')));
-  makeKPI(subRow, avgTTR,     'Avg Days to Resolve',  'plain', null);
+  // Update date badge dynamically
+  const months = [...new Set(main.map(r => r['Month Opened']).filter(Boolean))].sort();
+  if (months.length) {
+    const first = new Date(months[0]).toLocaleString('default', {month:'short', year:'numeric'});
+    const last  = new Date(months[months.length-1]).toLocaleString('default', {month:'short', year:'numeric'});
+    document.getElementById('generatedBadge').textContent = `Data: ${first} – ${last}`;
+  }
 
   // ── Monthly Chart ─────────────────────────────────────────
   const allMonths = [...new Set([
