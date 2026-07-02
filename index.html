@@ -91,6 +91,12 @@
   </div>
 </header>
 
+<div style="margin: 18px 40px 0; background: #f0fafa; border-left: 4px solid #23CED9; border-radius: 12px; padding: 14px 20px;">
+  <p style="font-size: 0.82rem; color: #2a6a70; line-height: 1.6;">
+    <strong>Note on PRB-linked cases:</strong> This dashboard does not currently split out PRB-linked cases because the source data export does not include a reliable case-to-PRB mapping. The analysis reflects all cases tagged as AI Search, with or without associated PRBs.
+  </p>
+</div>
+
 <div class="kpi-section">
   <div class="kpi-row" id="kpiRowTop"></div>
 </div>
@@ -149,10 +155,6 @@
 
     <p style="font-weight:600;color:#097C87;margin-bottom:6px">② Pass 2 — SME Validation</p>
     <p>Cases not matched in Pass 1 were escalated for subject matter expert review. Each case's full description and resolution notes were evaluated against workstream definitions to ensure accurate placement. Cases outside the AI Search scope (e.g. platform performance, ATF testing, routing requests) were consolidated under <strong>Others</strong>. After both passes, <strong>0 cases remained unclassified</strong>.</p>
-
-    <p style="margin-top:14px;font-size:0.78rem;color:#5a8a8a;background:#f0fafa;border-radius:8px;padding:10px 14px">
-      <strong>Note on PRB-linked cases:</strong> This dashboard does not currently split out PRB-linked cases because the source data export does not include a reliable case-to-PRB mapping. The analysis reflects all cases tagged as AI Search, with or without associated PRBs.
-    </p>
   </div>
 </div>
 <div class="grid">
@@ -221,12 +223,12 @@ fetch('data.json').then(r => r.json()).then(data => {
     document.getElementById('modalCount').textContent = rows.length + ' cases';
     const tbody = document.getElementById('modalTableBody');
     tbody.innerHTML = rows.map(r => {
-      const priClass = r['Pri'] || '';
+      const priClass = r['PriorityGroup'] || '';
       const stateClass = r['State'] === 'Closed' ? 'Closed' : 'open';
       return `<tr>
         <td><b>${r['Cases']}</b></td>
         <td style="max-width:260px">${r['Subject']}</td>
-        <td><span class="pill ${priClass}">${r['Pri']}</span></td>
+        <td><span class="pill ${priClass}">${r['PriorityGroup']}</span></td>
         <td><span class="pill ${stateClass}">${r['State']}</span></td>
         <td style="white-space:nowrap">${r['Bucket']||'—'}</td>
         <td>${r['Product']}</td>
@@ -251,10 +253,16 @@ fetch('data.json').then(r => r.json()).then(data => {
   }
 
   // ── KPI Cards ────────────────────────────────────────────
+  const priorityMap = {
+    '1 - Severe': 'P1', '2 - High': 'P2', '3 - Medium': 'P3', '4 - Low': 'P4',
+    'P1': 'P1', 'P2': 'P2', 'P3': 'P3', 'P4': 'P4'
+  };
+  main.forEach(r => { r['PriorityGroup'] = priorityMap[r['Pri']] || r['Pri']; });
+
   const total     = main.length;
   const closed    = main.filter(r => r['State'] === 'Closed').length;
   const openCases = main.filter(r => r['State'] !== 'Closed').length;
-  const p1        = main.filter(r => r['Pri'] === 'P1').length;
+  const p1        = main.filter(r => r['PriorityGroup'] === 'P1').length;
   const ttrs      = main.map(r => parseFloat(r['Days to Resolve'])).filter(v => !isNaN(v));
   const avgTTR    = ttrs.length ? (ttrs.reduce((a,b)=>a+b,0)/ttrs.length).toFixed(1) : '—';
 
@@ -270,15 +278,14 @@ fetch('data.json').then(r => r.json()).then(data => {
   makeKPI(topRow, total,     'Total Cases',         'plain', () => openModal('All Cases', main));
   makeKPI(topRow, closed,     'Closed',              'green', () => openModal('Closed Cases', main.filter(r => r['State']==='Closed')));
   makeKPI(topRow, openCases,  'Open / In Progress',  'amber', () => openModal('Open / In Progress', main.filter(r => r['State']!=='Closed')));
-  makeKPI(topRow, p1,         'P1 Cases',            'red',   () => openModal('P1 Cases', main.filter(r => r['Pri']==='P1')));
+  makeKPI(topRow, p1,         'P1 Cases',            'red',   () => openModal('P1 Cases', main.filter(r => r['PriorityGroup']==='P1')));
   makeKPI(topRow, avgTTR,     'Avg Days to Resolve', 'plain', null);
 
-  // Update date badge dynamically
+  // Update date badge dynamically (avoid timezone shift by parsing YYYY-MM directly)
   const months = [...new Set(main.map(r => r['Month Opened']).filter(Boolean))].sort();
   if (months.length) {
-    const first = new Date(months[0]).toLocaleString('default', {month:'short', year:'numeric'});
-    const last  = new Date(months[months.length-1]).toLocaleString('default', {month:'short', year:'numeric'});
-    document.getElementById('generatedBadge').textContent = `Data: ${first} – ${last}`;
+    const fmt = m => { const [y, mo] = m.split('-'); return new Date(+y, +mo-1, 1).toLocaleString('default', {month:'short', year:'numeric'}); };
+    document.getElementById('generatedBadge').textContent = `Data: ${fmt(months[0])} – ${fmt(months[months.length-1])}`;
   }
 
   // ── Monthly Chart ─────────────────────────────────────────

@@ -16,8 +16,8 @@ import re
 from pathlib import Path
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
-OVERALL_FILE = Path(__file__).parent / 'Overall Cases.xlsx'
-OUTPUT_FILE  = Path(__file__).parent / 'data.json'
+DATA_DIR = Path(__file__).parent
+OUTPUT_FILE = DATA_DIR / 'data.json'
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── BUCKET DEFINITIONS ────────────────────────────────────────────────────────
@@ -280,6 +280,48 @@ MANUAL_OVERRIDES = {
     'CS9208432': 'Others',
     'CS9173385': 'Search Relevancy',
     'CS9252019': 'AI Search Setup & Misc',
+    # May-June 2026 Needs Review
+    'CS9382649': 'Others',
+    'CS9294232': 'AI Search Setup & Misc',
+    'CS9338797': 'AI Search Setup & Misc',
+    'CS9333565': 'Others',
+    'CS9296926': 'Others',
+    'CS9301400': 'Others',
+    'CS9382385': 'Search Relevancy',
+    'CS9398936': 'Search Relevancy',
+    'CS9375632': 'AI Search Setup & Misc',
+    'CS9329252': 'AI Search Setup & Misc',
+    'CS9327928': 'AI Search Setup & Misc',
+    'CS9330970': 'AI Search Setup & Misc',
+    'CS9369051': 'AI Search Setup & Misc',
+    'CS9317857': 'Search & Virtual Agent',
+    'CS9307973': 'Others',
+    'CS9373256': 'Search & Virtual Agent',
+    'CS9302497': 'AI Search Setup & Misc',
+    'CS9327001': 'Search Relevancy',
+    'CS9378679': 'AI Search Setup & Misc',
+    'CS9325459': 'Search Analytics',
+    'CS9350374': 'Search Relevancy',
+    'CS9361293': 'AI Search Setup & Misc',
+    'CS9301058': 'AI Search Setup & Misc',
+    'CS9302455': 'AI Search Setup & Misc',
+    'CS9363797': 'AI Search Setup & Misc',
+    'CS9327052': 'AI Search Setup & Misc',
+    'CS9336859': 'Search & Virtual Agent',
+    'CS9333531': 'Search Relevancy',
+    'CS9330271': 'Search Relevancy',
+    'CS9398056': 'Search Relevancy',
+    'CS9310370': 'AI Search Setup & Misc',
+    'CS9303006': 'Search & Virtual Agent',
+    'CS9379888': 'AI Search Setup & Misc',
+    'CS9356199': 'Search Analytics',
+    'CS9376714': 'Search & Virtual Agent',
+    'CS9386833': 'Others',
+    'CS9379853': 'AI Search Setup & Misc',
+    'CS9353734': 'AI Search Setup & Misc',
+    'CS9295651': 'Search Analytics',
+    'CS9335730': 'Others',
+    'CS9346411': 'Search Relevancy',
 }
 
 
@@ -319,11 +361,27 @@ def to_record(row):
 
 def main():
     print('Loading data...')
-    overall = pd.read_excel(OVERALL_FILE, sheet_name='Page 1')
+
+    # Find all Overall Cases files and combine them
+    files = sorted(DATA_DIR.glob('Overall Cases*.xlsx'))
+    if not files:
+        raise FileNotFoundError(f'No Overall Cases*.xlsx files found in {DATA_DIR}')
+
+    print(f'Found {len(files)} file(s): {[f.name for f in files]}')
+    parts = []
+    for f in files:
+        df = pd.read_excel(f, sheet_name='Page 1')
+        print(f'  {f.name}: {len(df)} rows')
+        parts.append(df)
+
+    overall = pd.concat(parts, ignore_index=True)
+
+    # Deduplicate by case number, keeping the most recent record
+    overall = overall.sort_values('Created').drop_duplicates(subset='Number', keep='last')
 
     # Filter to AI Search cases
     ai_search = overall[overall['Product/service calculated'] == 'AI Search'].copy()
-    print(f'Overall rows: {len(overall)} | AI Search cases: {len(ai_search)}')
+    print(f'Combined overall rows: {len(overall)} | AI Search cases: {len(ai_search)}')
 
     # Normalize columns
     df = ai_search.rename(columns={
