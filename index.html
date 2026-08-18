@@ -225,9 +225,19 @@ fetch('data.json').then(r => r.json()).then(data => {
     return m;
   }
 
+  // Builds a live ServiceNow list URL filtered to the given case numbers
+  function buildServiceNowListUrl(caseNumbers) {
+    const encodedList = caseNumbers.join('%2C');
+    const target = `sn_customerservice_case_list.do?sysparm_query=numberIN${encodedList}&sysparm_first_row=1&sysparm_view=case`;
+    return `https://support.servicenow.com/now/nav/ui/classic/params/target/${encodeURIComponent(target)}`;
+  }
+
   function openModal(title, rows) {
     document.getElementById('modalTitle').textContent = title;
-    document.getElementById('modalCount').textContent = rows.length + ' cases';
+    const caseNumbers = rows.map(r => r['Cases']).filter(Boolean);
+    const snUrl = buildServiceNowListUrl(caseNumbers);
+    document.getElementById('modalCount').innerHTML =
+      `${rows.length} cases &nbsp;·&nbsp; <a href="${snUrl}" target="_blank" style="color:#097C87;font-weight:600;text-decoration:none">Open in ServiceNow &#8599;</a>`;
     const tbody = document.getElementById('modalTableBody');
     tbody.innerHTML = rows.map(r => {
       const priClass = r['PriorityGroup'] || '';
