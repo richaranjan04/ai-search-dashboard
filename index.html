@@ -69,6 +69,9 @@
     .pill.P4 { background:#d8f0d8; color:#2d6a2d; }
     .pill.Closed { background:#c8ecc8; color:#1a5a1a; }
     .pill.open   { background:#fde8d8; color:#8a4a10; }
+    .pill.conf-high { background:#c8ecc8; color:#1a5a1a; }
+    .pill.conf-medium { background:#fef3c7; color:#7a5a00; }
+    .pill.conf-low { background:#fde8d8; color:#8a4a10; }
 
     @media (max-width: 768px) {
       .grid { grid-template-columns: 1fr; }
@@ -193,7 +196,7 @@
           <tr>
             <th>Case</th><th>Subject</th><th>Priority</th><th>State</th>
             <th>Workstream</th><th>Product</th>
-            <th>Opened</th><th>Resolved</th><th>Days</th>
+            <th>Conf</th><th>Reasoning</th><th>Opened</th><th>Resolved</th><th>Closed</th><th>Days</th>
           </tr>
         </thead>
         <tbody id="modalTableBody"></tbody>
@@ -229,15 +232,26 @@ fetch('data.json').then(r => r.json()).then(data => {
     tbody.innerHTML = rows.map(r => {
       const priClass = r['PriorityGroup'] || '';
       const stateClass = r['State'] === 'Closed' ? 'Closed' : 'open';
+      const confValue = parseFloat(r['Confidence'] || '0');
+      const confClass = confValue >= 0.7 ? 'high' : confValue >= 0.5 ? 'medium' : 'low';
+      const confPill = `<span class="pill conf-${confClass}">${(confValue * 100).toFixed(0)}%</span>`;
+      const reasoning = r['Classification Reasoning'] || '—';
+      
+      const caseUrl = `https://support.servicenow.com/sn_customerservice_case.do?sysparm_query=number=${r['Cases']}`;
+      const caseLink = `<a href="${caseUrl}" target="_blank" style="color:#097C87;text-decoration:none;font-weight:600">${r['Cases']}</a>`;
+      
       return `<tr>
-        <td><b>${r['Cases']}</b></td>
+        <td>${caseLink}</td>
         <td style="max-width:260px">${r['Subject']}</td>
         <td><span class="pill ${priClass}">${r['PriorityGroup']}</span></td>
         <td><span class="pill ${stateClass}">${r['State']}</span></td>
         <td style="white-space:nowrap">${r['Bucket']||'—'}</td>
         <td>${r['Product']}</td>
+        <td>${confPill}</td>
+        <td style="max-width:200px;font-size:0.75rem;color:#5a8a8a">${reasoning}</td>
         <td style="white-space:nowrap">${(r['Date Opened']||'').slice(0,10)}</td>
         <td style="white-space:nowrap">${(r['Date Resolved']||'').slice(0,10)}</td>
+        <td style="white-space:nowrap">${(r['Date Closed']||'').slice(0,10)}</td>
         <td>${r['Days to Resolve']}</td>
       </tr>`;
     }).join('');
