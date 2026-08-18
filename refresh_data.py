@@ -20,11 +20,59 @@ DATA_DIR = Path(__file__).parent
 OUTPUT_FILE = DATA_DIR / 'data.json'
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ── BUCKET DEFINITIONS ────────────────────────────────────────────────────────
-# Priority order: more specific buckets first, broad Setup last, Needs Review fallback.
-# Each bucket: (name, [(field, pattern), ...])
-# field: 'subject' = subject only, 'full' = subject + description
+# ── TECHNICAL PATTERNS FOR RESOLUTION NOTES ANALYSIS ──────────────────────────
+# Based on Phase 1 analysis of 892 Resolution notes
+# Priority order reflects pattern specificity and technical importance
 
+TECHNICAL_PATTERNS = {
+    'Zing Search': {
+        'keywords': ['zing', 'zing search'],
+        'priority': 1,
+        'specificity': 0.9
+    },
+    'Genius Results': {
+        'keywords': ['genius result', 'genius results', 'genius'],
+        'priority': 2,
+        'specificity': 0.85
+    },
+    'External Content Connectors': {
+        'keywords': ['connector', 'external source', 'external content', 'sharepoint connector', 'crawl', 'web crawl', 'external kb', 'external knowledge'],
+        'priority': 3,
+        'specificity': 0.8
+    },
+    'Virtual Agent': {
+        'keywords': ['virtual agent', 'nava', 'va search', 'va profile', 'va context', 'now assist.*va', 'va.*now assist', 'now assist chatbot', 'suggested steps generation', 'agentic workflow', 'agent workspace'],
+        'priority': 4,
+        'specificity': 0.75
+    },
+    'Search Analytics': {
+        'keywords': ['search analytics', 'analytics dashboard', 'signal log', 'search signal', 'sys_search_event', 'search event', 'search tracking', 'search term'],
+        'priority': 5,
+        'specificity': 0.7
+    },
+    'Security & Access': {
+        'keywords': ['permission', 'access control', 'role.*search', 'user criteria', 'visibility', 'acl', 'access right', 'not authorized', 'unauthorized', 'guest account'],
+        'priority': 6,
+        'specificity': 0.65
+    },
+    'Search Relevancy': {
+        'keywords': ['relevancy', 'relevance', 'ranking', 'multilingual', 'context graph', 'inaccurate result', 'wrong result', 'no result', 'not returning', 'irrelevant', 'machine learning', 'recommended action', 'result improvement rule', 'boost action', 'hybrid search', 'semantic', 'rag retriev'],
+        'priority': 7,
+        'specificity': 0.6
+    },
+    'Migration & Upgrades': {
+        'keywords': ['migrat', 'migration', 'upgrade', 'patch', 'post-upgrade', 'pre-upgrade'],
+        'priority': 8,
+        'specificity': 0.55
+    },
+    'AI Search Setup & Misc': {
+        'keywords': ['provision', 'activat', 'index', 'queue', 'stuck', 'config', 'setup', 'dictionary', 'spell check', 'performance', 'slow', 'latency'],
+        'priority': 9,
+        'specificity': 0.5
+    },
+}
+
+# ── LEGACY BUCKET RULES (for fallback) ────────────────────────────────────────
 BUCKET_RULES = [
     ('Zing Search', [
         ('subject', r'\bzing\b'),
@@ -338,21 +386,96 @@ MANUAL_OVERRIDES = {
 }
 
 
-def classify(case_id, subject, description):
+def classify_with_confidence(case_id, subject, description, resolution_notes, state):
+    """
+    Classify cases using Resolution notes analysis with confidence scoring.
+    Returns: (category, confidence_score, reasoning)
+    """
+    # Check manual overrides first
     if case_id and case_id in MANUAL_OVERRIDES:
-        return MANUAL_OVERRIDES[case_id]
-
-    subj = str(subject).lower()
-    desc = str(description).lower()
+        return MANUAL_OVERRIDES[case_id], 1.0, "Manual override specified"
+    
+    # Normalize text inputs
+    subj = str(subject).lower() if subject else ""
+    desc = str(description).lower() if description else ""
+    res_notes = str(resolution_notes).lower() if resolution_notes else ""
+    
+    # Step 1: Analyze Resolution notes (primary source for closed cases)
+    if state == 'Closed' and res_notes and res_notes != 'nan':
+        category, confidence, reasoning = analyze_technical_patterns(res_notes, 'Resolution notes')
+        if confidence >= 0.5:
+            return category, confidence, reasoning
+    
+    # Step 2: Analyze Description (secondary source)
+    if desc and desc != 'nan':
+        category, confidence, reasoning = analyze_technical_patterns(desc, 'Description')
+        if confidence >= 0.5:
+            return category, confidence, reasoning
+    
+    # Step 3: Analyze Subject (tertiary source)
+    if subj:
+        category, confidence, reasoning = analyze_technical_patterns(subj, 'Subject')
+        if confidence >= 0.5:
+            return category, confidence, reasoning
+    
+    # Step 4: Fallback to legacy keyword matching
     full = subj + ' ' + desc
-
     for bucket, rules in BUCKET_RULES:
         for field, pattern in rules:
             text = subj if field == 'subject' else full
             if re.search(pattern, text):
-                return bucket
+                return bucket, 0.3, f"Legacy keyword match in {field}"
+    
+    # Step 5: Final fallback to broad category
+    return 'AI Search Setup & Misc', 0.1, "No technical patterns detected, assigned to broad category"
 
-    return 'Needs Review'
+
+def analyze_technical_patterns(text, source):
+    """
+    Analyze text for technical patterns and return classification with confidence.
+    Returns: (category, confidence_score, reasoning)
+    """
+    patterns_found = []
+    
+    for category, pattern_info in TECHNICAL_PATTERNS.items():
+        keywords = pattern_info['keywords']
+        priority = pattern_info['priority']
+        specificity = pattern_info['specificity']
+        
+        for keyword in keywords:
+            if keyword in text:
+                patterns_found.append({
+                    'category': category,
+                    'keyword': keyword,
+                    'priority': priority,
+                    'specificity': specificity
+                })
+                break  # Only count each category once per text source
+    
+    if not patterns_found:
+        return None, 0.0, "No technical patterns detected"
+    
+    # Sort by priority (lower number = higher priority)
+    patterns_found.sort(key=lambda x: x['priority'])
+    
+    # If multiple patterns, reduce confidence
+    confidence_reduction = 0.1 * (len(patterns_found) - 1) if len(patterns_found) > 1 else 0
+    
+    # Select primary pattern (highest priority)
+    primary_pattern = patterns_found[0]
+    category = primary_pattern['category']
+    base_confidence = primary_pattern['specificity']
+    
+    # Apply confidence reduction for multiple patterns
+    final_confidence = max(0.1, base_confidence - confidence_reduction)
+    
+    # Build reasoning
+    keywords_found = [p['keyword'] for p in patterns_found]
+    reasoning = f"Technical patterns in {source}: {', '.join(keywords_found)}"
+    if len(patterns_found) > 1:
+        reasoning += f" (multiple patterns, confidence reduced)"
+    
+    return category, final_confidence, reasoning
 
 
 def to_record(row):
@@ -363,6 +486,10 @@ def to_record(row):
         'State':           str(row.get('State', '')),
         'Product':         str(row.get('Product', '')),
         'Bucket':          str(row.get('Bucket', '')),
+        'Description':     str(row.get('Description', '')),
+        'Resolution notes': str(row.get('Resolution notes', '')),
+        'Confidence':      str(row.get('Confidence', '')),
+        'Classification Reasoning': str(row.get('Classification Reasoning', '')),
         'Date Opened':     row['Date Opened'].strftime('%Y-%m-%d %H:%M') if pd.notna(row.get('Date Opened')) else '',
         'Date Resolved':   row['Date Resolved'].strftime('%Y-%m-%d %H:%M') if pd.notna(row.get('Date Resolved')) else '',
         'Date Closed':     row['Date Closed'].strftime('%Y-%m-%d %H:%M') if pd.notna(row.get('Date Closed')) else '',
@@ -422,10 +549,20 @@ def main():
     df['Month Opened'] = df['Date Opened'].dt.to_period('M').astype(str)
     df['Month Closed'] = df['Date Closed'].dt.to_period('M').astype(str)
 
-    # Classify
-    df['Bucket'] = df.apply(
-        lambda r: classify(r.get('Cases', ''), r.get('Subject', ''), r.get('Description', '')), axis=1
+    # Classify with confidence
+    classification_results = df.apply(
+        lambda r: classify_with_confidence(
+            r.get('Cases', ''), 
+            r.get('Subject', ''), 
+            r.get('Description', ''),
+            r.get('Resolution notes', ''),
+            r.get('State', '')
+        ), axis=1
     )
+    
+    df['Bucket'] = classification_results.apply(lambda x: x[0])
+    df['Confidence'] = classification_results.apply(lambda x: x[1])
+    df['Classification Reasoning'] = classification_results.apply(lambda x: x[2])
 
     print('\nBucket distribution:')
     print(df['Bucket'].value_counts().to_string())
